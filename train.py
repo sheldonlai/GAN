@@ -75,11 +75,7 @@ def train(train=True, output_name='output'):
         else:
             return res
 
-    data, labels = get_cifar10_dict()
-
-    m_data, x_dim, y_dim, channels = cifar10_dict_to_matrix(3, data)
-    del data, labels
-    gc.collect()
+    m_data, x_dim, y_dim, channels = read_image_data()
 
     batch_size = 64
     if y_dim == 1:
@@ -142,7 +138,7 @@ def train(train=True, output_name='output'):
                 print("Unable to recover session starting anew.")
 
             print("starting")
-            for epoch in range(100):
+            for epoch in range(500):
                 batch_idx = (len(m_data) // batch_size) - 2
                 for idx in range(batch_idx):
                     batch_images = get_samples(idx)
@@ -168,7 +164,6 @@ def train(train=True, output_name='output'):
                         start_time = time.time()
                     if counter % 1000 == 0:
                         saver.save(sess, os.getcwd() + "/training/train", global_step=global_step)
-
 
         else:
             saver.restore(sess, tf.train.latest_checkpoint(os.getcwd() + "/training/"))

@@ -1,11 +1,15 @@
 import os
 import subprocess
+from shutil import copyfile
 
 import imageio as imageio
 import matplotlib.pyplot as plt
 import soundfile as sf
 import numpy as np
 from math import sqrt
+
+from PIL import Image
+from math import ceil
 
 
 def analyze_sound(filename):
@@ -121,7 +125,7 @@ def get_cifar10_dict():
 
 
 def cifar10_dict_to_matrix(label, data):
-    return np.swapaxes(np.array(data[str(label)]).reshape([len(data[str(label)]), 3, 32, 32]), 1 , 3), 32, 32, 3
+    return np.swapaxes(np.array(data[str(label)]).reshape([len(data[str(label)]), 3, 32, 32]), 1, 3), 32, 32, 3
 
 
 def cifar10_batch_to_matrix(data):
@@ -137,7 +141,7 @@ def combine_image_arrays(data, img_dim):
 
     matrix = np.array([])
     for i in range(h):
-        row_array = [np.reshape(data[i*w + j], [x_dim, y_dim, channels]) for j in range(w)]
+        row_array = [np.reshape(data[i * w + j], [x_dim, y_dim, channels]) for j in range(w)]
         row = np.concatenate(row_array, axis=1)
         if len(matrix) == 0:
             matrix = row
@@ -154,3 +158,111 @@ def get_cifar10_batch():
     for file_path in file_names:
         data.append(unpickle(file_path))
     return data, unpickle(os.path.join(path, 'test_batch'))
+
+
+def fetch_image_files():
+    # copy the files to cat_images
+    path = "C:\\Users\\SHELDON\\Pictures\\cats"
+
+    size = 256
+
+    file_names = [os.path.join(dp, f) for dp, dn, filenames in os.walk(path)
+                  for f in filenames if f[-4:] == '.jpg']
+    dst_path = "./train_images"
+    if not os.path.exists(dst_path):
+        os.makedirs(dst_path)
+    file_names = file_names[0:min(4000, len(file_names))]
+    for filename in file_names:
+        if os.path.isfile(filename + ".cat"):
+
+            with open(filename + ".cat") as cat_file:
+                line = cat_file.readline().rstrip()
+            array = np.array(line.split(" ")[1:]).astype(np.int).reshape([-1, 2])
+            print(filename)
+            max_x, max_y = np.max(array, axis=0)
+            print(max_x, max_y)
+            min_x, min_y = np.min(array, axis=0)
+            print(min_x, min_y)
+
+            img = Image.open(filename)
+            left, upper, right, lower = img.getbbox()
+            if lower < size or right < size:
+                continue
+            img2 = crop_image(img, max_x, max_y, min_x, min_y)
+            img2.save(os.path.join(dst_path, os.path.basename(filename)), "JPEG")
+        else:
+            copyfile(filename, os.path.join(dst_path, os.path.basename(filename)))
+
+
+def crop_image(img, max_x, max_y, min_x, min_y, size=256):
+    """
+    :param size:
+    :param img: PIL image
+    :param max_x:
+    :param max_y:
+    :param min_x:
+    :param min_y:
+    :param padding:
+    :return: cropped and rescaled image of size x size
+    """
+    max_dif = max(max_x - min_x, max_y - min_y)
+    padding = ceil(max_dif / 2)
+    left, upper, right, lower = img.getbbox()
+    # assert left <= min_x, "left: %d, min_x: %d" % (left, min_x)
+    # assert right >= max_x, "right: %d, max_x: %d" % (right, max_x)
+    # assert upper <= max_y
+    # assert lower >= min_y
+
+    # shrink image if the points difference is larger than size
+    # if max_dif > size:
+    #     factor = size/max_dif
+    #     img.thumbnail((lower*factor, right*factor))
+    #     max_y *= factor
+    #     min_y *= factor
+    #     max_x *= factor
+    #     min_x *= factor
+
+    # make height and width equal
+    if max_x - min_x > max_y - min_y:
+        dif = max_x - min_x - (max_y - min_y)
+        max_y += dif // 2
+        min_y -= ceil(dif / 2)
+
+    elif max_x - min_x < max_y - min_y:
+        dif = abs(max_x - min_x - (max_y - min_y))
+        max_x += dif // 2
+        min_x -= ceil(dif / 2)
+
+    # make sure padding + max or min is within bounds
+    # if not decrease padding
+    if left > min_x - padding:
+        padding = abs(left - min_x)
+    if right < max_x + padding:
+        padding = right - max_x
+    if upper > max_y + padding:
+        padding = upper - max_x
+    if lower < min_y - padding:
+        padding = abs(lower - max_x)
+
+    img2 = img.crop((min_x - padding, min_y - padding, max_x + padding, max_y + padding))
+    img2.thumbnail((size, size))
+    return img2
+
+
+def get_cifar10_gan_data(label=0):
+    data, labels = get_cifar10_dict()
+
+    return cifar10_dict_to_matrix(label, data)
+
+
+def read_image_data():
+    path = "./train_images"
+
+    files = [os.path.join(path, fn) for fn in os.listdir(path) if fn[-4:] == '.jpg']
+    data = []
+    for fn in files:
+        d = imageio.imread(fn)
+        if d.shape == (256, 256, 3):
+            data.append(d)
+    print("have %d samples" % len(data))
+    return data, 256, 256, 3
