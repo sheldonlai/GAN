@@ -1,0 +1,11 @@
+/assets/**
+/cifar/**
+/image_out/**
+/training/**
+/image_out/**
+/out/**
+/sample/**
+/__pycache__/**
+/.idea/**
+/part2/**
+/part3/**
