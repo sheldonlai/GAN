@@ -73,7 +73,10 @@ def convert_sound_array_to_matrix(array, strategy=None):
 
 
 def write_image_matrix(array, name, strategy=None):
-    imageio.imwrite('./image_out/' + name + '.jpg', array)
+    dst_path = './image_out/'
+    if not os.path.exists(dst_path):
+        os.makedirs(dst_path)
+    imageio.imwrite(os.path.join(dst_path, name + '.jpg'), array)
 
 
 def get_cifar_data():
@@ -147,7 +150,7 @@ def combine_image_arrays(data, img_dim):
             matrix = row
         else:
             matrix = np.vstack([matrix, row])
-    return matrix
+    return matrix.astype(np.uint8)
 
 
 def get_cifar10_batch():
@@ -202,7 +205,6 @@ def crop_image(img, max_x, max_y, min_x, min_y, size=256):
     :param max_y:
     :param min_x:
     :param min_y:
-    :param padding:
     :return: cropped and rescaled image of size x size
     """
     max_dif = max(max_x - min_x, max_y - min_y)

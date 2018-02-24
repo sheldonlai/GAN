@@ -5,7 +5,7 @@ import gc
 import tensorflow as tf
 from tensorflow.contrib.layers import batch_norm
 
-from ops import conv2d, dense, conv_transpose, conv1d, conv1d_transpose
+from ops import conv2d, dense, conv_transpose, conv1d, conv1d_transpose, residual_block, residual_transpose_block
 from util.utils import *
 
 tf.logging.set_verbosity(tf.logging.DEBUG)
@@ -15,7 +15,20 @@ def train(train=True, output_name='output'):
     def discriminator(data, reuse=False):
         if reuse:
             tf.get_variable_scope().reuse_variables()
-        if y_dim > 1:
+        if x_dim >= 128 and y_dim > 128:
+            # ResNet
+            layers = []
+            for i in range(res_net_layers):
+                if i == 0:
+                    layers.append(residual_block(data, df_dim, True, block_num=i))
+                elif i % 4 == 0:
+                    layers.append(residual_block(layers[i - 1], layers[i - 1].get_shape()[-1] * 2, False, block_num=i))
+                else:
+                    layers.append(residual_block(layers[i - 1], layers[i - 1].get_shape()[-1], False, block_num=i))
+
+            dense_output_layer = dense(layers[-1], 1, name="dense_" + str(res_net_layers))
+            return tf.nn.sigmoid(dense_output_layer), dense_output_layer
+        elif y_dim > 1:
             h0 = tf.nn.leaky_relu(batch_norm(conv2d(data, df_dim, name='d_h0_conv'), scope="bn_0"))
             h1 = tf.nn.leaky_relu(batch_norm(conv2d(h0, df_dim * 2, name='d_h1_conv'), scope="bn_1"))
             h2 = tf.nn.leaky_relu(batch_norm(conv2d(h1, df_dim * 4, name='d_h2_conv'), scope="bn_2"))
@@ -42,8 +55,26 @@ def train(train=True, output_name='output'):
         return ceil(x_dim / pow(2, layer))
 
     def generator(z):
-        _, dim0, dim1, gf_dim4 = get_dim2d(4)
-        if y_dim > 1:
+        _, dim0, dim1, gf_dim4 = get_dim2d(res_net_layers // 4)
+        if x_dim >= 128 and y_dim > 128:
+            # ResNet transpose
+            layers = []
+            for i in range(res_net_layers):
+                if i == 0:
+                    z2 = dense(z, dim0 * dim1 * gf_dim4)
+                    layers.append(residual_transpose_block(
+                        tf.reshape(z2, [batch_size, dim0, dim1, gf_dim4]), gf_dim4, True, block_num=i))
+                elif i % 4 == 0:
+                    layers.append(
+                        residual_transpose_block(layers[i - 1], layers[i - 1].get_shape()[-1] // 2, False, block_num=i))
+                else:
+                    layers.append(
+                        residual_transpose_block(layers[i - 1], layers[i - 1].get_shape()[-1], False, block_num=i))
+
+            last_layer = residual_transpose_block(layers[-1], 3, last_block=True, block_num=res_net_layers)
+
+            return (tf.nn.tanh(last_layer) + 1) * 255 / 2
+        elif y_dim > 1:
             z2 = dense(z, dim0 * dim1 * gf_dim4)
             # h05 = tf.nn.leaky_relu(batch_norm(tf.reshape(z2, [-1, dim0, dim1, gf_dim * 16])))
             # h0 = tf.nn.leaky_relu(batch_norm(conv_transpose(h05, get_dim2d(4), name="g_h0")))
@@ -77,20 +108,21 @@ def train(train=True, output_name='output'):
 
     m_data, x_dim, y_dim, channels = read_image_data()
 
-    batch_size = 64
+    res_net_layers = 24
+    batch_size = 8
     if y_dim == 1:
         data_shape = [x_dim, channels]
     else:
         data_shape = [x_dim, y_dim, channels]
     z_dim = 100
-    gf_dim = 64
-    df_dim = 64
+    gf_dim = 16
+    df_dim = 16
     learning_rate = 0.00002
     beta1 = 0.5
 
     with tf.Session() as sess:
         # build model
-        images = tf.placeholder(tf.float32, [batch_size] + data_shape, name="real_sound")
+        images = tf.placeholder(tf.float32, [batch_size] + data_shape, name="real")
         zin = tf.placeholder(tf.float32, [None, z_dim], name="z")
         with tf.variable_scope("generator"):
             generated = generator(zin)
@@ -151,9 +183,9 @@ def train(train=True, output_name='output'):
 
                     counter = tf.train.global_step(sess, global_step)
 
-                    if counter % 200 == 0:
+                    if counter % 100 == 0:
                         sdata = sess.run([generated], feed_dict={zin: display_z})
-                        write_image_matrix(combine_image_arrays(sdata[0], [sqrt(batch_size), sqrt(batch_size)]),
+                        write_image_matrix(combine_image_arrays(sdata[0], [4, 2]),
                                            'output_' + str(counter))
 
                         errD_fake = d_loss_fake.eval({zin: display_z})
