@@ -113,12 +113,12 @@ def residual_block(input_layer, output_channel, first_block=False, block_num=Non
             if first_block:
                 conv1 = conv2d(input_layer, output_channel, name='conv2d_1', d_h=stride, d_w=stride, k_w=7, k_h=7)
             else:
-                conv1 = tf.nn.relu(
+                conv1 = tf.nn.leaky_relu(
                     batch_norm(conv2d(input_layer, output_channel, name='conv2d_1', d_h=stride, d_w=stride, k_h=3, k_w=3),
                                scope="bn1"))
 
         with tf.variable_scope('conv2_in_block' + block_num):
-            conv2 = tf.nn.relu(batch_norm(conv2d(
+            conv2 = tf.nn.leaky_relu(batch_norm(conv2d(
                 conv1, output_channel, name='conv2d_2', d_h=1, d_w=1, k_h=3, k_w=3), scope="bn2"))
 
         if first_block:
@@ -142,6 +142,32 @@ def x_str(s):
     if s is None:
         return ''
     return str(s)
+
+
+def conv_transpose_layer(input_layer, output_channel, last_block=False, block_num=None):
+    # custom implementation of a residual_block that does transpose convolution
+    block_num = x_str(block_num)
+
+    bn, dim_x, dim_y, input_channel = input_layer.get_shape().as_list()
+
+    if input_channel // 2 == output_channel:
+        stride = 2
+        output_dim = [bn, dim_x * 2, dim_y * 2, int(output_channel)]
+    elif input_channel == output_channel:
+        stride = 1
+        output_dim = [bn, dim_x, dim_y, int(output_channel)]
+    else:
+        raise ValueError('Output and input channel does not match in residual blocks!!!')
+
+    with tf.variable_scope('conv1_in_block_' + block_num):
+        if last_block:
+            conv1 = conv_transpose(input_layer, output_dim, name='conv2d_1', d_h=stride, d_w=stride, k_w=7, k_h=7)
+        else:
+            conv1 = tf.nn.relu(
+                batch_norm(
+                    conv_transpose(input_layer, output_dim, name='conv2d_1', d_h=stride, d_w=stride),
+                    scope="bn1"))
+    return conv1
 
 
 def residual_transpose_block(input_layer, output_channel, last_block=False, block_num=None):
@@ -183,8 +209,8 @@ def residual_transpose_block(input_layer, output_channel, last_block=False, bloc
     else:
         residual_orig_input = input_layer
 
-    print("conv1: %s, conv2 : %s, residual_orig_input: %s" %
-          (conv1.get_shape(), conv2.get_shape(), residual_orig_input.get_shape()))
+    # print("conv1: %s, conv2 : %s, residual_orig_input: %s" %
+    #       (conv1.get_shape(), conv2.get_shape(), residual_orig_input.get_shape()))
     output = conv2 + residual_orig_input
     return output
 

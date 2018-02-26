@@ -268,3 +268,22 @@ def read_image_data():
             data.append(d)
     print("have %d samples" % len(data))
     return data, 256, 256, 3
+
+
+def generate_video_from_images(path):
+    from skvideo.io import vwrite
+    import cv2
+    import os
+
+    image_folder = path
+    video_name = 'video.avi'
+
+    images = [img for img in os.listdir(image_folder) if img.endswith(".jpg") and img.startswith("output")]
+
+    data = []
+    for image in images:
+        data.append(cv2.imread(os.path.join(image_folder, image))[:, :2048])
+
+    vwrite(os.path.join('./sample', video_name), np.array(data))
+    # subprocess.call(
+    #     ["./util/ffmpeg", '-r', '10', '-i', './image_out/output_%d.jpg', '-vcodec', 'mpeg4', '-y', 'movie.mp4'])

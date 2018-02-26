@@ -5,7 +5,8 @@ import gc
 import tensorflow as tf
 from tensorflow.contrib.layers import batch_norm
 
-from ops import conv2d, dense, conv_transpose, conv1d, conv1d_transpose, residual_block, residual_transpose_block
+from ops import conv2d, dense, conv_transpose, conv1d, conv1d_transpose, residual_block, residual_transpose_block, \
+    conv_transpose_layer
 from util.utils import *
 
 tf.logging.set_verbosity(tf.logging.DEBUG)
@@ -15,7 +16,7 @@ def train(train=True, output_name='output'):
     def discriminator(data, reuse=False):
         if reuse:
             tf.get_variable_scope().reuse_variables()
-        if x_dim >= 128 and y_dim > 128:
+        if False and x_dim >= 128 and y_dim > 128:
             # ResNet
             layers = []
             for i in range(res_net_layers):
@@ -33,10 +34,10 @@ def train(train=True, output_name='output'):
             h1 = tf.nn.leaky_relu(batch_norm(conv2d(h0, df_dim * 2, name='d_h1_conv'), scope="bn_1"))
             h2 = tf.nn.leaky_relu(batch_norm(conv2d(h1, df_dim * 4, name='d_h2_conv'), scope="bn_2"))
             h3 = tf.nn.leaky_relu(batch_norm(conv2d(h2, df_dim * 8, name='d_h3_conv'), scope="bn_3"))
-            # h4 = tf.nn.relu(batch_norm(conv2d(h3, df_dim * 16, name='d_h4_conv'), scope="bn_4"))
-            # h5 = dense(h4, 1)
-            h4 = dense(h3, 1)
-            return tf.nn.sigmoid(h4), h4
+            h4 = tf.nn.relu(batch_norm(conv2d(h3, df_dim * 16, name='d_h4_conv'), scope="bn_4"))
+            h5 = dense(h4, 1)
+            # h4 = dense(h3, 1)
+            return tf.nn.sigmoid(h5), h5
         else:
             h0 = tf.nn.relu(batch_norm(conv1d(data, df_dim, name='d_h0_conv'), scope="bn_0"))
             h1 = tf.nn.relu(batch_norm(conv1d(h0, df_dim * 2, k_w=8, name='d_h1_conv'), scope="bn_1"))
@@ -55,15 +56,17 @@ def train(train=True, output_name='output'):
         return ceil(x_dim / pow(2, layer))
 
     def generator(z):
-        _, dim0, dim1, gf_dim4 = get_dim2d(res_net_layers // 4)
-        if x_dim >= 128 and y_dim > 128:
+
+        if x_dim >= 128 and y_dim > 128 and res_net:
+            _, dim0, dim1, gf_dim_last = get_dim2d(res_net_layers // 4)
+            z2 = dense(z, dim0 * dim1 * gf_dim_last)
             # ResNet transpose
             layers = []
             for i in range(res_net_layers):
                 if i == 0:
-                    z2 = dense(z, dim0 * dim1 * gf_dim4)
+
                     layers.append(residual_transpose_block(
-                        tf.reshape(z2, [batch_size, dim0, dim1, gf_dim4]), gf_dim4, True, block_num=i))
+                        tf.reshape(z2, [batch_size, dim0, dim1, gf_dim_last]), gf_dim_last, True, block_num=i))
                 elif i % 4 == 0:
                     layers.append(
                         residual_transpose_block(layers[i - 1], layers[i - 1].get_shape()[-1] // 2, False, block_num=i))
@@ -75,11 +78,13 @@ def train(train=True, output_name='output'):
 
             return (tf.nn.tanh(last_layer) + 1) * 255 / 2
         elif y_dim > 1:
-            z2 = dense(z, dim0 * dim1 * gf_dim4)
+            _, dim0, dim1, gf_dim_last = get_dim2d(5)
+            z2 = dense(z, dim0 * dim1 * gf_dim_last)
             # h05 = tf.nn.leaky_relu(batch_norm(tf.reshape(z2, [-1, dim0, dim1, gf_dim * 16])))
             # h0 = tf.nn.leaky_relu(batch_norm(conv_transpose(h05, get_dim2d(4), name="g_h0")))
-            h0 = tf.nn.relu(batch_norm(tf.reshape(z2, [-1, dim0, dim1, gf_dim4])))
-            h1 = tf.nn.relu(batch_norm(conv_transpose(h0, get_dim2d(3), name="g_h1")))
+            h0 = tf.nn.relu(batch_norm(tf.reshape(z2, [-1, dim0, dim1, gf_dim_last])))
+            h05 = tf.nn.relu(batch_norm(conv_transpose(h0, get_dim2d(4), name="g_h1")))
+            h1 = tf.nn.relu(batch_norm(conv_transpose(h05, get_dim2d(3), name="g_h05")))
             h2 = tf.nn.relu(batch_norm(conv_transpose(h1, get_dim2d(2), name="g_h2")))
             h3 = tf.nn.relu(batch_norm(conv_transpose(h2, get_dim2d(1), name="g_h3")))
             h4 = conv_transpose(h3, [batch_size, x_dim, y_dim, channels], name="g_h4")
@@ -108,16 +113,19 @@ def train(train=True, output_name='output'):
 
     m_data, x_dim, y_dim, channels = read_image_data()
 
-    res_net_layers = 24
-    batch_size = 8
+    #
+    res_net = False
+    res_net_layers = 32
+
+    batch_size = 64
     if y_dim == 1:
         data_shape = [x_dim, channels]
     else:
         data_shape = [x_dim, y_dim, channels]
     z_dim = 100
-    gf_dim = 16
-    df_dim = 16
-    learning_rate = 0.00002
+    gf_dim = 64
+    df_dim = 64
+    learning_rate = 0.000002
     beta1 = 0.5
 
     with tf.Session() as sess:
@@ -170,7 +178,7 @@ def train(train=True, output_name='output'):
                 print("Unable to recover session starting anew.")
 
             print("starting")
-            for epoch in range(500):
+            for epoch in range(1000):
                 batch_idx = (len(m_data) // batch_size) - 2
                 for idx in range(batch_idx):
                     batch_images = get_samples(idx)
@@ -185,7 +193,7 @@ def train(train=True, output_name='output'):
 
                     if counter % 100 == 0:
                         sdata = sess.run([generated], feed_dict={zin: display_z})
-                        write_image_matrix(combine_image_arrays(sdata[0], [4, 2]),
+                        write_image_matrix(combine_image_arrays(sdata[0], [4, batch_size/4]),
                                            'output_' + str(counter))
 
                         errD_fake = d_loss_fake.eval({zin: display_z})

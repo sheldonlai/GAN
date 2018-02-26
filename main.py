@@ -14,3 +14,6 @@ if __name__ == '__main__':
             utils.fetch_sample_files()
         elif sys.argv[1] == "generate":
             train(train=False)
+        elif sys.argv[1] == "ftv":
+            # file to video
+            utils.generate_video_from_images("./image_out")
