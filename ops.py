@@ -84,9 +84,10 @@ def conv1d_transpose(input_, output_shape, k_w=5, d_w=2, stddev=0.02, name="deco
 
 
 # modified code from https://github.com/wenxinxu/resnet-in-tensorflow/blob/master/resnet.py
-def residual_block(input_layer, output_channel, first_block=False, block_num=None):
+def residual_block(input_layer, output_channel, first_block=False, block_num=None, avg_pool_add=True):
     """
     Defines a residual block in ResNet
+    :param avg_pool_add: boolean to determine if the function do a residual avg pool addition if the dimension is changed
     :param block_num: number of the block (used for naming scope)
     :param input_layer: 4D tensor
     :param output_channel: int. return_tensor.get_shape()[-1] = output_channel
@@ -121,7 +122,7 @@ def residual_block(input_layer, output_channel, first_block=False, block_num=Non
             conv2 = tf.nn.leaky_relu(batch_norm(conv2d(
                 conv1, output_channel, name='conv2d_2', d_h=1, d_w=1, k_h=3, k_w=3), scope="bn2"))
 
-        if first_block:
+        if first_block or (not avg_pool_add and increase_dim):
             return conv2
 
         # When the channels of input layer and conv2 does not match, we add zero pads to increase the
@@ -170,7 +171,7 @@ def conv_transpose_layer(input_layer, output_channel, last_block=False, block_nu
     return conv1
 
 
-def residual_transpose_block(input_layer, output_channel, last_block=False, block_num=None):
+def residual_transpose_block(input_layer, output_channel, last_block=False, block_num=None, avg_pool_add=True):
     # custom implementation of a residual_block that does transpose convolution
     block_num = x_str(block_num)
 
@@ -201,7 +202,7 @@ def residual_transpose_block(input_layer, output_channel, last_block=False, bloc
                        scope="bn2"))
 
     # conversion from depth (e.g. 64 to 3 channels) then just return conv2
-    if last_block:
+    if last_block or (not avg_pool_add and decrease_dim):
         return conv2
 
     if decrease_dim:
@@ -216,6 +217,7 @@ def residual_transpose_block(input_layer, output_channel, last_block=False, bloc
 
 
 def reverse_average_pool(input_layer, output_dim):
+    # TODO : Needs to be tested!!!
     """
     Custom implementation to perform something like a reverse average pool
     :param input_layer: with dimension (batch num, x, y, d)

@@ -16,4 +16,4 @@ if __name__ == '__main__':
             train(train=False)
         elif sys.argv[1] == "ftv":
             # file to video
-            utils.generate_video_from_images("./image_out")
+            utils.generate_video_from_images("../images")

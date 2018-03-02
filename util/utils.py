@@ -6,10 +6,13 @@ import imageio as imageio
 import matplotlib.pyplot as plt
 import soundfile as sf
 import numpy as np
+import re
 from math import sqrt
 
 from PIL import Image
 from math import ceil
+
+from skvideo.io import FFmpegWriter
 
 
 def analyze_sound(filename):
@@ -276,14 +279,15 @@ def generate_video_from_images(path):
     import os
 
     image_folder = path
-    video_name = 'video.avi'
+    video_name = 'video_3.mp4'
 
     images = [img for img in os.listdir(image_folder) if img.endswith(".jpg") and img.startswith("output")]
+    images = sorted(images, key=lambda x: (int(re.sub('\D', '', x)), x))
+    writer = FFmpegWriter(os.path.join('./sample', video_name),
+                          inputdict={'-r': '3'}, outputdict={'-r': '3'})
 
-    data = []
     for image in images:
-        data.append(cv2.imread(os.path.join(image_folder, image))[:, :2048])
-
-    vwrite(os.path.join('./sample', video_name), np.array(data))
+        writer.writeFrame(cv2.imread(os.path.join(image_folder, image))[:, :2048])
+    writer.close()
     # subprocess.call(
     #     ["./util/ffmpeg", '-r', '10', '-i', './image_out/output_%d.jpg', '-vcodec', 'mpeg4', '-y', 'movie.mp4'])

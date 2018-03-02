@@ -22,14 +22,16 @@ def train(train=True, output_name='output'):
             for i in range(res_net_layers):
                 if i == 0:
                     layers.append(residual_block(data, df_dim, True, block_num=i))
-                elif i % 4 == 0:
-                    layers.append(residual_block(layers[i - 1], layers[i - 1].get_shape()[-1] * 2, False, block_num=i))
+                elif i % res_net_bc == 0:
+                    layers.append(residual_block(layers[i - 1], layers[i - 1].get_shape()[-1] * 2,
+                                                 False, block_num=i, avg_pool_add=False))
                 else:
                     layers.append(residual_block(layers[i - 1], layers[i - 1].get_shape()[-1], False, block_num=i))
 
             dense_output_layer = dense(layers[-1], 1, name="dense_" + str(res_net_layers))
             return tf.nn.sigmoid(dense_output_layer), dense_output_layer
         elif y_dim > 1:
+
             h0 = tf.nn.leaky_relu(batch_norm(conv2d(data, df_dim, name='d_h0_conv'), scope="bn_0"))
             h1 = tf.nn.leaky_relu(batch_norm(conv2d(h0, df_dim * 2, name='d_h1_conv'), scope="bn_1"))
             h2 = tf.nn.leaky_relu(batch_norm(conv2d(h1, df_dim * 4, name='d_h2_conv'), scope="bn_2"))
@@ -58,18 +60,18 @@ def train(train=True, output_name='output'):
     def generator(z):
 
         if x_dim >= 128 and y_dim > 128 and res_net:
-            _, dim0, dim1, gf_dim_last = get_dim2d(res_net_layers // 4)
+            _, dim0, dim1, gf_dim_last = get_dim2d(res_net_layers // res_net_bc)
             z2 = dense(z, dim0 * dim1 * gf_dim_last)
             # ResNet transpose
             layers = []
             for i in range(res_net_layers):
                 if i == 0:
-
                     layers.append(residual_transpose_block(
                         tf.reshape(z2, [batch_size, dim0, dim1, gf_dim_last]), gf_dim_last, True, block_num=i))
-                elif i % 4 == 0:
+                elif i % res_net_bc == 0:
                     layers.append(
-                        residual_transpose_block(layers[i - 1], layers[i - 1].get_shape()[-1] // 2, False, block_num=i))
+                        residual_transpose_block(layers[i - 1], layers[i - 1].get_shape()[-1] // 2,
+                                                 False, block_num=i, avg_pool_add=False))
                 else:
                     layers.append(
                         residual_transpose_block(layers[i - 1], layers[i - 1].get_shape()[-1], False, block_num=i))
@@ -115,7 +117,10 @@ def train(train=True, output_name='output'):
 
     #
     res_net = False
-    res_net_layers = 32
+    res_net_layers = 8
+
+    # number of block before the residual network change in dimension
+    res_net_bc = 2
 
     batch_size = 64
     if y_dim == 1:
