@@ -31,15 +31,19 @@ def train(train=True, output_name='output'):
             dense_output_layer = dense(layers[-1], 1, name="dense_" + str(res_net_layers))
             return tf.nn.sigmoid(dense_output_layer), dense_output_layer
         elif y_dim > 1:
-
-            h0 = tf.nn.leaky_relu(batch_norm(conv2d(data, df_dim, name='d_h0_conv'), scope="bn_0"))
-            h1 = tf.nn.leaky_relu(batch_norm(conv2d(h0, df_dim * 2, name='d_h1_conv'), scope="bn_1"))
-            h2 = tf.nn.leaky_relu(batch_norm(conv2d(h1, df_dim * 4, name='d_h2_conv'), scope="bn_2"))
-            h3 = tf.nn.leaky_relu(batch_norm(conv2d(h2, df_dim * 8, name='d_h3_conv'), scope="bn_3"))
-            h4 = tf.nn.relu(batch_norm(conv2d(h3, df_dim * 16, name='d_h4_conv'), scope="bn_4"))
-            h5 = dense(h4, 1)
+            prev_layer = tf.nn.leaky_relu(batch_norm(conv2d(data, df_dim, name='d_h0_conv'), scope="bn_0"))
+            for i in range(1,num_layers - 2):
+                prev_layer = tf.nn.leaky_relu(batch_norm(conv2d(prev_layer, df_dim * pow(2,i),
+                                                                name='d_h'+str(i)+'_conv'), scope="bn_"+str(i)))
+            dense_layer = dense(prev_layer, 1)
+            # h0 = tf.nn.leaky_relu(batch_norm(conv2d(data, df_dim, name='d_h0_conv'), scope="bn_0"))
+            # h1 = tf.nn.leaky_relu(batch_norm(conv2d(h0, df_dim * 2, name='d_h1_conv'), scope="bn_1"))
+            # h2 = tf.nn.leaky_relu(batch_norm(conv2d(h1, df_dim * 4, name='d_h2_conv'), scope="bn_2"))
+            # h3 = tf.nn.leaky_relu(batch_norm(conv2d(h2, df_dim * 8, name='d_h3_conv'), scope="bn_3"))
+            # h4 = tf.nn.relu(batch_norm(conv2d(h3, df_dim * 16, name='d_h4_conv'), scope="bn_4"))
+            # h5 = dense(h4, 1)
             # h4 = dense(h3, 1)
-            return tf.nn.sigmoid(h5), h5
+            return tf.nn.sigmoid(dense_layer), dense_layer
         else:
             h0 = tf.nn.relu(batch_norm(conv1d(data, df_dim, name='d_h0_conv'), scope="bn_0"))
             h1 = tf.nn.relu(batch_norm(conv1d(h0, df_dim * 2, k_w=8, name='d_h1_conv'), scope="bn_1"))
@@ -80,17 +84,22 @@ def train(train=True, output_name='output'):
 
             return (tf.nn.tanh(last_layer) + 1) * 255 / 2
         elif y_dim > 1:
-            _, dim0, dim1, gf_dim_last = get_dim2d(5)
+            # _, dim0, dim1, gf_dim_last = get_dim2d(5)
+            # z2 = dense(z, dim0 * dim1 * gf_dim_last)
+            # h0 = tf.nn.relu(batch_norm(tf.reshape(z2, [-1, dim0, dim1, gf_dim_last])))
+            # h05 = tf.nn.relu(batch_norm(conv_transpose(h0, get_dim2d(4), name="g_h1")))
+            # h1 = tf.nn.relu(batch_norm(conv_transpose(h05, get_dim2d(3), name="g_h05")))
+            # h2 = tf.nn.relu(batch_norm(conv_transpose(h1, get_dim2d(2), name="g_h2")))
+            # h3 = tf.nn.relu(batch_norm(conv_transpose(h2, get_dim2d(1), name="g_h3")))
+            # h4 = conv_transpose(h3, [batch_size, x_dim, y_dim, channels], name="g_h4")
+            # return (tf.nn.tanh(h4) + 1) * 255 / 2
+            _, dim0, dim1, gf_dim_last = get_dim2d(num_layers-1)
             z2 = dense(z, dim0 * dim1 * gf_dim_last)
-            # h05 = tf.nn.leaky_relu(batch_norm(tf.reshape(z2, [-1, dim0, dim1, gf_dim * 16])))
-            # h0 = tf.nn.leaky_relu(batch_norm(conv_transpose(h05, get_dim2d(4), name="g_h0")))
-            h0 = tf.nn.relu(batch_norm(tf.reshape(z2, [-1, dim0, dim1, gf_dim_last])))
-            h05 = tf.nn.relu(batch_norm(conv_transpose(h0, get_dim2d(4), name="g_h1")))
-            h1 = tf.nn.relu(batch_norm(conv_transpose(h05, get_dim2d(3), name="g_h05")))
-            h2 = tf.nn.relu(batch_norm(conv_transpose(h1, get_dim2d(2), name="g_h2")))
-            h3 = tf.nn.relu(batch_norm(conv_transpose(h2, get_dim2d(1), name="g_h3")))
-            h4 = conv_transpose(h3, [batch_size, x_dim, y_dim, channels], name="g_h4")
-            return (tf.nn.tanh(h4) + 1) * 255 / 2
+            prev_layer = tf.nn.relu(batch_norm(tf.reshape(z2, [-1, dim0, dim1, gf_dim_last])))
+            for i in range(1,num_layers - 1):
+                prev_layer = tf.nn.relu(batch_norm(conv_transpose(prev_layer, get_dim2d(num_layers-i-1), name="g_h" + str(i))))
+            hlast = conv_transpose(prev_layer, [batch_size, x_dim, y_dim, channels], name="g_h" + str(num_layers - 1))
+            return (tf.nn.tanh(hlast) + 1) * 255 / 2
         else:
             z2 = dense(z, get_x_dim1d(4) * gf_dim * 8)
             h0 = tf.nn.relu(batch_norm(tf.reshape(z2, get_dim1d(4))))
@@ -113,14 +122,17 @@ def train(train=True, output_name='output'):
         else:
             return res
 
-    m_data, x_dim, y_dim, channels = read_image_data()
+    m_data, x_dim, y_dim, channels = get_training_data_for_label(1)
 
-    #
+    # resnet variables
     res_net = False
     res_net_layers = 8
 
     # number of block before the residual network change in dimension
     res_net_bc = 2
+
+    # normal convolution variables
+    num_layers = 3
 
     batch_size = 64
     if y_dim == 1:
@@ -198,7 +210,7 @@ def train(train=True, output_name='output'):
 
                     if counter % 100 == 0:
                         sdata = sess.run([generated], feed_dict={zin: display_z})
-                        write_image_matrix(combine_image_arrays(sdata[0], [4, batch_size/4]),
+                        write_image_matrix(combine_image_arrays(sdata[0], [8, batch_size/8]),
                                            'output_' + str(counter))
 
                         errD_fake = d_loss_fake.eval({zin: display_z})

@@ -14,6 +14,8 @@ from math import ceil
 
 from skvideo.io import FFmpegWriter
 
+from util.downloader import maybe_download_and_extract
+
 
 def analyze_sound(filename):
     sig, samplerate = sf.read(filename)
@@ -114,11 +116,24 @@ def unpickle(file):
     return dict
 
 
+def _maybe_download_cifar10_data():
+    path = './data/cifar10'
+
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    maybe_download_and_extract(path)
+
+
 def get_cifar10_dict():
     data = {}
-    path = './cifar/cifar-10-batches-py'
+    path = './data/cifar10/cifar-10-batches-py'
+
+    _maybe_download_cifar10_data()
+
     file_names = [os.path.join(path, f) for f in os.listdir(path)
-                  if os.path.isfile(os.path.join(path, f)) and "data_batch" in f]
+              if os.path.isfile(os.path.join(path, f)) and "data_batch" in f]
+
     for file_path in file_names:
         temp = unpickle(file_path)
         for i in range(len(temp[b'data'])):
@@ -128,6 +143,11 @@ def get_cifar10_dict():
                 data[str(temp[b'labels'][i])] = [temp[b'data'][i]]
 
     return data, unpickle(os.path.join(path, 'test_batch'))
+
+
+def get_training_data_for_label(label):
+    d, t = get_cifar10_dict()
+    return cifar10_dict_to_matrix(label, d)
 
 
 def cifar10_dict_to_matrix(label, data):
@@ -158,7 +178,8 @@ def combine_image_arrays(data, img_dim):
 
 def get_cifar10_batch():
     data = []
-    path = './cifar/cifar-10-batches-py'
+    path = './data/cifar10'
+    _maybe_download_cifar10_data()
     file_names = [os.path.join(path, f) for f in os.listdir(path)
                   if os.path.isfile(os.path.join(path, f)) and "data_batch" in f]
     for file_path in file_names:
