@@ -7,7 +7,7 @@ if __name__ == '__main__':
         if sys.argv[1] == "sound":
             utils.analyze_sound(sys.argv[2])
         elif sys.argv[1] == "fetchimg":
-            utils.fetch_image_files()
+            utils.fetch_image_files(128)
         elif sys.argv[1] == "train":
             train()
         elif sys.argv[1] == "convert":

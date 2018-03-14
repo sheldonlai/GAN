@@ -178,7 +178,7 @@ def combine_image_arrays(data, img_dim):
 
 def get_cifar10_batch():
     data = []
-    path = './data/cifar10'
+    path = './data/cifar10/cifar-10-batches-py'
     _maybe_download_cifar10_data()
     file_names = [os.path.join(path, f) for f in os.listdir(path)
                   if os.path.isfile(os.path.join(path, f)) and "data_batch" in f]
@@ -187,12 +187,9 @@ def get_cifar10_batch():
     return data, unpickle(os.path.join(path, 'test_batch'))
 
 
-def fetch_image_files():
+def fetch_image_files(size=256):
     # copy the files to cat_images
     path = "C:\\Users\\SHELDON\\Pictures\\cats"
-
-    size = 256
-
     file_names = [os.path.join(dp, f) for dp, dn, filenames in os.walk(path)
                   for f in filenames if f[-4:] == '.jpg']
     dst_path = "./train_images"
@@ -215,7 +212,7 @@ def fetch_image_files():
             left, upper, right, lower = img.getbbox()
             if lower < size or right < size:
                 continue
-            img2 = crop_image(img, max_x, max_y, min_x, min_y)
+            img2 = crop_image(img, max_x, max_y, min_x, min_y, size=size)
             img2.save(os.path.join(dst_path, os.path.basename(filename)), "JPEG")
         else:
             copyfile(filename, os.path.join(dst_path, os.path.basename(filename)))
@@ -243,10 +240,11 @@ def crop_image(img, max_x, max_y, min_x, min_y, size=256):
     # if max_dif > size:
     #     factor = size/max_dif
     #     img.thumbnail((lower*factor, right*factor))
-    #     max_y *= factor
-    #     min_y *= factor
-    #     max_x *= factor
-    #     min_x *= factor
+    #     max_y = ceil(max_y * factor)
+    #     min_y = ceil(min_y * factor)
+    #     max_x = ceil(max_x * factor)
+    #     min_x = ceil(min_x * factor)
+    #     left, upper, right, lower = img.getbbox()
 
     # make height and width equal
     if max_x - min_x > max_y - min_y:
@@ -259,18 +257,49 @@ def crop_image(img, max_x, max_y, min_x, min_y, size=256):
         max_x += dif // 2
         min_x -= ceil(dif / 2)
 
+    assert abs(max_x - min_x) == abs(max_y - min_y), 'dif x %f doesn\'t match dif y %f' % \
+                                                     (abs(max_x - min_x), abs(max_y - min_y))
+
+    padding = ceil(max(0, size - abs(max_x - min_x)) / 2)
+    horizontal_shift = 0
+    vertical_shift = 0
+
+    def left_border():
+        return min_x - padding + horizontal_shift
+
+    def right_border():
+        return max_x + padding + horizontal_shift
+
+    def top_border():
+        return min_y - padding + vertical_shift
+
+    def bot_border():
+        return max_y + padding + vertical_shift
+
+    while True:
+        if left > left_border() - padding and horizontal_shift >= 0:
+            horizontal_shift += 1
+        if right < right_border() and horizontal_shift <= 0:
+            horizontal_shift -= 1
+        if upper > top_border() and vertical_shift >= 0:
+            vertical_shift += 1
+        if lower < bot_border() - padding and vertical_shift <= 0:
+            vertical_shift -= 1
+        else:
+            break
+
     # make sure padding + max or min is within bounds
     # if not decrease padding
-    if left > min_x - padding:
-        padding = abs(left - min_x)
-    if right < max_x + padding:
-        padding = right - max_x
-    if upper > max_y + padding:
-        padding = upper - max_x
-    if lower < min_y - padding:
-        padding = abs(lower - max_x)
+    if left > left_border():
+        padding = abs(left_border() - left)
+    if right < right_border():
+        padding = abs(right_border() - right)
+    if upper > top_border():
+        padding = abs(top_border() - upper)
+    if lower < bot_border():
+        padding = abs(bot_border() - lower)
 
-    img2 = img.crop((min_x - padding, min_y - padding, max_x + padding, max_y + padding))
+    img2 = img.crop((left_border(), top_border(), right_border(), bot_border()))
     img2.thumbnail((size, size))
     return img2
 
@@ -281,17 +310,17 @@ def get_cifar10_gan_data(label=0):
     return cifar10_dict_to_matrix(label, data)
 
 
-def read_image_data():
+def read_image_data(dim=256):
     path = "./train_images"
 
     files = [os.path.join(path, fn) for fn in os.listdir(path) if fn[-4:] == '.jpg']
     data = []
     for fn in files:
         d = imageio.imread(fn)
-        if d.shape == (256, 256, 3):
+        if d.shape == (dim, dim, 3):
             data.append(d)
     print("have %d samples" % len(data))
-    return data, 256, 256, 3
+    return data, dim, dim, 3
 
 
 def generate_video_from_images(path):

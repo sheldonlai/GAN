@@ -35,14 +35,14 @@ def train(train=True, output_name='output'):
             for i in range(1,num_layers - 2):
                 prev_layer = tf.nn.leaky_relu(batch_norm(conv2d(prev_layer, df_dim * pow(2,i),
                                                                 name='d_h'+str(i)+'_conv'), scope="bn_"+str(i)))
-            dense_layer = dense(prev_layer, 1)
+            prev_layer = tf.nn.relu(batch_norm(conv2d(prev_layer, df_dim * 16, name='d_h4_conv'), scope="bn_4"))
+            dense_layer = dense(tf.reshape(prev_layer, (batch_size, -1)), 1)
             # h0 = tf.nn.leaky_relu(batch_norm(conv2d(data, df_dim, name='d_h0_conv'), scope="bn_0"))
             # h1 = tf.nn.leaky_relu(batch_norm(conv2d(h0, df_dim * 2, name='d_h1_conv'), scope="bn_1"))
             # h2 = tf.nn.leaky_relu(batch_norm(conv2d(h1, df_dim * 4, name='d_h2_conv'), scope="bn_2"))
             # h3 = tf.nn.leaky_relu(batch_norm(conv2d(h2, df_dim * 8, name='d_h3_conv'), scope="bn_3"))
             # h4 = tf.nn.relu(batch_norm(conv2d(h3, df_dim * 16, name='d_h4_conv'), scope="bn_4"))
             # h5 = dense(h4, 1)
-            # h4 = dense(h3, 1)
             return tf.nn.sigmoid(dense_layer), dense_layer
         else:
             h0 = tf.nn.relu(batch_norm(conv1d(data, df_dim, name='d_h0_conv'), scope="bn_0"))
@@ -122,8 +122,10 @@ def train(train=True, output_name='output'):
         else:
             return res
 
-    m_data, x_dim, y_dim, channels = get_training_data_for_label(1)
+    data, labels = get_cifar10_batch()
+    m_data, x_dim, y_dim, channels = cifar10_batch_to_matrix(data[0])
 
+    print(len(m_data))
     # resnet variables
     res_net = False
     res_net_layers = 8
@@ -132,7 +134,7 @@ def train(train=True, output_name='output'):
     res_net_bc = 2
 
     # normal convolution variables
-    num_layers = 3
+    num_layers = 6
 
     batch_size = 64
     if y_dim == 1:
@@ -208,7 +210,7 @@ def train(train=True, output_name='output'):
 
                     counter = tf.train.global_step(sess, global_step)
 
-                    if counter % 100 == 0:
+                    if counter % 500 == 0:
                         sdata = sess.run([generated], feed_dict={zin: display_z})
                         write_image_matrix(combine_image_arrays(sdata[0], [8, batch_size/8]),
                                            'output_' + str(counter))
