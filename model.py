@@ -15,7 +15,16 @@ def convert_tanh_float_to_uint(images):
 
 class GANModel(object):
     def __init__(self, data_loader, num_layers=6, batch_size=128, learning_rate=0.00002,
+                 z_dim=100, filter_depth=32,
                  chkpnt_dir="training", imageout_dir="image_out", scope="ml"):
+        print("""
+        Model:
+        num_layers: %d
+        batch_size: %d
+        learning_rate: %f
+        
+        """ % (num_layers, batch_size, learning_rate))
+
         self.chkpnt_dir = os.path.join(os.getcwd(), chkpnt_dir)
         self.chkpnt_path = os.path.join(os.getcwd(), chkpnt_dir, 'ckpt')
         self.imageout_dir = imageout_dir
@@ -23,7 +32,7 @@ class GANModel(object):
 
         self.image_out_dim = int(floor(sqrt(batch_size)))
 
-        self.z_dim = 200
+        self.z_dim = z_dim
         self.display_z = np.random.uniform(-1, 1, [self.batch_size, self.z_dim]).astype(np.float32)
 
         scope_prefix = scope + '/'
@@ -32,8 +41,8 @@ class GANModel(object):
             # normal convolution variables
             data_shape = [x_dim, y_dim, channels]
 
-            gf_dim = 64
-            df_dim = 64
+            gf_dim = filter_depth
+            df_dim = filter_depth
             self.learning_rate = learning_rate
             beta1 = 0.5
 
@@ -91,8 +100,6 @@ class GANModel(object):
             # build model
             # self.images = self.queue.dequeue_many(self.batch_size)
             self.images = tf.placeholder(tf.float32, [self.batch_size] + data_shape, name="real")
-            # self.images = tf.Print(self.images, [self.images], 'shape: ')
-            # self.zin = tf.random_uniform([self.batch_size, self.z_dim], -1, 1)
             self.zin = tf.placeholder(tf.float32, [self.batch_size, self.z_dim], name="z")
 
             self.global_step = tf.Variable(1, trainable=False, name='global_step')
