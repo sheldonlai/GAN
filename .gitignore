@@ -1,12 +1,6 @@
-/assets/**
-/cifar/**
-/image_out/**
 /training/**
 /image_out/**
-/out/**
+/data/**
 /sample/**
 /__pycache__/**
 /.idea/**
-/part2/**
-/part3/**
-/train_images/**

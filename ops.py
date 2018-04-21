@@ -1,5 +1,4 @@
 import tensorflow as tf
-import numpy as np
 from tensorflow.contrib.layers import batch_norm
 
 
@@ -233,6 +232,6 @@ def reverse_average_pool(input_layer, output_dim):
         raise ValueError("d: [%d] is not divisible by 2" % d)
 
 
-def dense(x, outputFeatures, name="dense"):
+def dense(x, outputFeatures, activation=None, name="dense"):
     with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
-        return tf.layers.dense(x, outputFeatures)
+        return tf.layers.dense(x, outputFeatures, activation=activation)
