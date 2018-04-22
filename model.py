@@ -15,7 +15,7 @@ def convert_tanh_float_to_uint(images):
 
 class GANModel(object):
     def __init__(self, data_loader, num_layers=6, batch_size=128, learning_rate=0.00002,
-                 z_dim=100, filter_depth=32,
+                 z_dim=100, filter_depth=32, train=True,
                  chkpnt_dir="training", imageout_dir="image_out", scope="ml"):
         print("""
         Model:
@@ -37,38 +37,40 @@ class GANModel(object):
 
         scope_prefix = scope + '/'
         with tf.variable_scope(scope):
-            m_data, x_dim, y_dim, channels = data_loader.get_data()
-            # normal convolution variables
+            if train:
+                m_data, x_dim, y_dim, channels = data_loader.get_data()
+            else:
+                m_data = []
+                x_dim, y_dim, channels = data_loader.get_dim()
+
             data_shape = [x_dim, y_dim, channels]
 
             gf_dim = filter_depth
             df_dim = filter_depth
             self.learning_rate = learning_rate
-            beta1 = 0.5
 
-            # mask = np.random.choice(len(m_data), len(m_data) // 10, replace=False)
             m_data = (m_data / 127.5) - 1
-            # self.valid_data = m_data[mask]
-            self.m_data = m_data#np.array([e for i, e in enumerate(m_data) if i not in mask])
+            self.m_data = m_data
 
             self.x_dim = x_dim
             self.y_dim = y_dim
             self.channels = channels
 
+            beta1 = 0.5
             min_after_dequeue = batch_size
-            num_threads = 1
+            num_threads = 2
 
             self.batch_len_in_epoch = (len(self.m_data) // self.batch_size) - 2
 
-            # capacity = batch_size * 8
-            #
-            # self.queue = tf.RandomShuffleQueue(capacity=capacity, min_after_dequeue=min_after_dequeue,
-            #                                    dtypes=tf.float32, shapes=data_shape)
-            #
-            # enqueue_op = self.queue.enqueue_many(self.m_data)
-            #
-            # qr = tf.train.QueueRunner(self.queue, [enqueue_op] * num_threads)
-            # tf.train.add_queue_runner(qr)
+            capacity = batch_size * 8
+
+            self.queue = tf.RandomShuffleQueue(capacity=capacity, min_after_dequeue=min_after_dequeue,
+                                               dtypes=tf.float32, shapes=data_shape)
+
+            enqueue_op = self.queue.enqueue_many(self.m_data)
+
+            qr = tf.train.QueueRunner(self.queue, [enqueue_op] * num_threads)
+            tf.train.add_queue_runner(qr)
 
             self.last_time = time.time()
 
@@ -98,8 +100,11 @@ class GANModel(object):
                 return tf.nn.tanh(hlast)
 
             # build model
-            # self.images = self.queue.dequeue_many(self.batch_size)
-            self.images = tf.placeholder(tf.float32, [self.batch_size] + data_shape, name="real")
+            if train:
+                self.images = self.queue.dequeue_many(self.batch_size)
+            else:
+                self.images = tf.placeholder(tf.float32, [self.batch_size] + data_shape, name="real")
+
             self.zin = tf.placeholder(tf.float32, [self.batch_size, self.z_dim], name="z")
 
             self.global_step = tf.Variable(1, trainable=False, name='global_step')
@@ -177,10 +182,10 @@ class GANModel(object):
         return tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=labels))
 
     def train(self, sess):
-        images = self.get_training_batch(tf.train.global_step(sess, self.global_step) % self.batch_len_in_epoch)
+        # images = self.get_training_batch(tf.train.global_step(sess, self.global_step) % self.batch_len_in_epoch)
         z = np.random.uniform(-1, 1, [self.batch_size, self.z_dim]).astype(np.float32)
         sess.run([self.d_optim_op, self.g_optim_op, self.increment_global_step_op],
-                 feed_dict={self.zin: z, self.images: images})
+                 feed_dict={self.zin: z})
         return tf.train.global_step(sess, self.global_step)
 
     def save_model(self, sess):

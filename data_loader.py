@@ -18,6 +18,9 @@ class CatDataLoader(object):
         print("loaded %d images" % len(m_data))
         return m_data, x_dim, y_dim, channels
 
+    def get_dim(self):
+        return self.dim, self.dim, 3
+
 
 class CifarLoader(object):
 
@@ -54,3 +57,8 @@ class CifarLoader(object):
                 m_data = sess.run(tf.image.resize_images(m_data, np.array([x_dim, y_dim])))
 
         return m_data, x_dim, y_dim, channels
+
+    def get_dim(self):
+        x_dim = int(math.floor(32 * self.scale))
+        y_dim = int(math.floor(32 * self.scale))
+        return y_dim, x_dim, 3
