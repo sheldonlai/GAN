@@ -40,7 +40,7 @@ class GANModel(object):
             if train:
                 m_data, x_dim, y_dim, channels = data_loader.get_data()
             else:
-                m_data = []
+                m_data = np.array([])
                 x_dim, y_dim, channels = data_loader.get_dim()
 
             data_shape = [x_dim, y_dim, channels]
@@ -62,17 +62,17 @@ class GANModel(object):
 
             self.batch_len_in_epoch = (len(self.m_data) // self.batch_size) - 2
 
-            capacity = batch_size * 8
+            if train:
+                # setup queue
+                capacity = batch_size * 8
 
-            self.queue = tf.RandomShuffleQueue(capacity=capacity, min_after_dequeue=min_after_dequeue,
-                                               dtypes=tf.float32, shapes=data_shape)
+                self.queue = tf.RandomShuffleQueue(capacity=capacity, min_after_dequeue=min_after_dequeue,
+                                                   dtypes=tf.float32, shapes=data_shape)
 
-            enqueue_op = self.queue.enqueue_many(self.m_data)
+                enqueue_op = self.queue.enqueue_many(self.m_data)
 
-            qr = tf.train.QueueRunner(self.queue, [enqueue_op] * num_threads)
-            tf.train.add_queue_runner(qr)
-
-            self.last_time = time.time()
+                qr = tf.train.QueueRunner(self.queue, [enqueue_op] * num_threads)
+                tf.train.add_queue_runner(qr)
 
             def discriminator(data, reuse=False):
                 if reuse:
@@ -146,7 +146,9 @@ class GANModel(object):
                 self.g_optim = tf.train.AdamOptimizer(self.learning_rate, beta1=beta1)
                 self.g_optim_op = self.g_optim.minimize(self.gloss, var_list=self.g_vars)
 
-            self.saver = tf.train.Saver(max_to_keep=10, keep_checkpoint_every_n_hours=1)
+            self.saver = tf.train.Saver(var_list=[*self.d_vars, *self.g_vars, self.global_step],
+                                        max_to_keep=10, keep_checkpoint_every_n_hours=1)
+            self.last_time = time.time()
 
     def recover_lastest_checkpoint(self, sess):
         try:
@@ -184,28 +186,42 @@ class GANModel(object):
     def train(self, sess):
         # images = self.get_training_batch(tf.train.global_step(sess, self.global_step) % self.batch_len_in_epoch)
         z = np.random.uniform(-1, 1, [self.batch_size, self.z_dim]).astype(np.float32)
-        sess.run([self.d_optim_op, self.g_optim_op, self.increment_global_step_op],
+        res = sess.run([self.d_optim_op, self.g_optim_op, self.increment_global_step_op, self.dloss, self.gloss],
                  feed_dict={self.zin: z})
-        return tf.train.global_step(sess, self.global_step)
+        return tf.train.global_step(sess, self.global_step), res[-2], res[-1]
 
     def save_model(self, sess):
         save_path = os.path.join(os.getcwd(), self.chkpnt_dir)
         if not os.path.exists(save_path):
             os.makedirs(save_path)
-        self.saver.save(sess, self.chkpnt_path, global_step=self.global_step)
+        self.saver.save(sess, self.chkpnt_path, global_step=self.global_step, write_meta_graph=False)
 
-    def save_image(self, images, name='pic'):
+    def save_image(self, images, name='pic', image_out_dim=None, directory=None):
         if len(images) > self.batch_size:
             raise Exception('The batch size is smaller.')
 
-        combined_images = combine_image_arrays(images[:self.image_out_dim ** 2],
-                                               [self.image_out_dim, self.image_out_dim])
-        write_image_matrix(combined_images, name, dst_folder=self.imageout_dir)
+        if directory is None:
+            directory = self.imageout_dir
+        if image_out_dim is None:
+            image_out_dim = self.image_out_dim
 
-    def print_results(self, step, sess, start_time=None):
+        combined_images = combine_image_arrays(images[:image_out_dim ** 2],
+                                               [image_out_dim, image_out_dim])
+        write_image_matrix(combined_images, name=name, dst_folder=directory)
+
+    def print_results(self, step, sess, start_time=None,  d_loss=None, g_loss=None):
         if start_time is None:
             start_time = self.last_time
         sdata = sess.run(self.generated, feed_dict={self.zin: self.display_z})
-        self.save_image(sdata[:self.image_out_dim ** 2], 'output_' + str(step))
-        print('time eplased %4.4f, step: %d' % ((time.time() - start_time), step))
+        self.save_image(sdata[:self.image_out_dim ** 2], name='output_' + str(step))
+        if g_loss is not None and d_loss is not None:
+            print('time eplased %4.4f, step: %d, d_loss: %4.4f, g_loss %4.4f' %
+                  ((time.time() - start_time), step, d_loss, g_loss))
+        else:
+            print('time eplased %4.4f, step: %d' % ((time.time() - start_time), step))
+
         self.last_time = time.time()
+
+    def generate_images(self, sess):
+        z = np.random.uniform(-1, 1, [self.batch_size, self.z_dim]).astype(np.float32)
+        return sess.run(self.generated, feed_dict={self.zin: z})

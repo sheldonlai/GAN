@@ -13,9 +13,16 @@ git clone the project
 
 #### Running on the cat data set
 `python main.py --data_set=cat --batch_size=128 --creativity=100 
---filter_depth=64 --learning_rate=0.002 --num_layers=6 --sub_dir=cat`\
+--filter_depth=64 --learning_rate=0.002 --num_layers=7 --sub_dir=cat`\
 Note that I decreased the learning rate by a factor of 10 after the output 
 images are relatively similar
 
 #### Running on the cifar-10 dataset
 `python main.py`
+
+#### sample results
+![](sample_result/sample.png)
+
+#### Dataset used
+https://archive.org/details/CAT_DATASET
+https://www.cs.toronto.edu/~kriz/cifar.html

@@ -20,21 +20,32 @@ def maybe_download_and_extract_cat_data():
     maybe_download_and_extract(url2, download_dir)
 
 
-def read_cat_image_data(dim=256):
+def read_cat_image_data(dim=256, check_black_borders=True):
     path = os.path.join(download_dir, "train_images")
 
     files = [os.path.join(path, fn) for fn in os.listdir(path) if fn[-4:] == '.jpg']
     data = []
-
+    files_not_used = []
     for fn in files:
         try:
             d = imageio.imread(fn)
+            if check_black_borders:
+                top_row = d[0, :, :]
+                bot_row = d[-1, :, :]
+                left_col = d[:, -1, :]
+                right_col = d[:, -1, :]
+                if np.array_equal(np.zeros_like(right_col), right_col) or np.array_equal(np.zeros_like(left_col),
+                                                                             left_col) or np.array_equal(
+                        np.zeros_like(bot_row), bot_row) or np.array_equal(np.zeros_like(top_row), top_row):
+                    files_not_used.append(fn)
+                    continue
+
             if d.shape == (dim, dim, 3):
                 data.append(d)
         except Exception as e:
             print("cannot read file %s" % fn)
-
     print("have %d samples" % len(data))
+    print("%d files are not used" % len(files_not_used))
     return np.array(data), dim, dim, 3
 
 
