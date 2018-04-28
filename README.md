@@ -12,8 +12,7 @@ git clone the project
 ### Sample Running commands
 
 #### Running on the cat data set
-`python main.py --data_set=cat --batch_size=128 --creativity=100 
---filter_depth=64 --learning_rate=0.002 --num_layers=7 --sub_dir=cat`\
+`--data_set=cat --batch_size=128 --creativity=200 --filter_depth=64 --learning_rate=0.002 --num_layers=6 --sub_dir=Cat_layer_6_200_creativity --save=500`\
 Note that I decreased the learning rate by a factor of 10 after the output 
 images are relatively similar
 

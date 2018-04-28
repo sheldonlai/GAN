@@ -27,7 +27,7 @@ tf.app.flags.DEFINE_string('sub_dir', '', "subdirectory inside training and imag
 
 tf.app.flags.DEFINE_string('generate_name', 'generated_sample', "name of generated file in GEN mode")
 tf.app.flags.DEFINE_string('generate_type', 'random', "possible types 'random' 'arg_max' 'threshold'")
-tf.app.flags.DEFINE_integer('generate_output_dim', 32, "name of generated file in GEN mode")
+tf.app.flags.DEFINE_integer('generate_output_dim', 64, "name of generated file in GEN mode")
 
 
 tf.app.flags.DEFINE_integer('filter_depth', 32, "filter depth")

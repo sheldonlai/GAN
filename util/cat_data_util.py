@@ -10,7 +10,7 @@ from math import ceil
 
 url1 = 'https://archive.org/download/CAT_DATASET/CAT_DATASET_01.zip'
 url2 = 'https://archive.org/download/CAT_DATASET/CAT_DATASET_02.zip'
-download_dir = './data/cat'
+download_dir = './data/cat'  # assuming you are calling from root level
 
 
 def maybe_download_and_extract_cat_data():
@@ -35,8 +35,8 @@ def read_cat_image_data(dim=256, check_black_borders=True):
                 left_col = d[:, -1, :]
                 right_col = d[:, -1, :]
                 if np.array_equal(np.zeros_like(right_col), right_col) or np.array_equal(np.zeros_like(left_col),
-                                                                             left_col) or np.array_equal(
-                        np.zeros_like(bot_row), bot_row) or np.array_equal(np.zeros_like(top_row), top_row):
+                                                                                         left_col) or np.array_equal(
+                    np.zeros_like(bot_row), bot_row) or np.array_equal(np.zeros_like(top_row), top_row):
                     files_not_used.append(fn)
                     continue
 
